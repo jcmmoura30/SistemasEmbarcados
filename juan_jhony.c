@@ -21,41 +21,39 @@ void main() {
     unsigned short duty = 0;
     float tensao = 0.0;
 
-    // === CONFIGURAÇÕES INICIAIS ===
-    TRISA = 0xFF;      // RA0 como entrada
-    TRISB = 0x00;      // PORTB como saída para LEDs
+    TRISA = 0xFF;     // RA0 como entrada (ADC)
+    TRISB = 0x00;     // PORTB como saída (LEDs)
     PORTB = 0x00;
+    TRISC2_bit = 0;   // RC2 como saída (PWM)
 
-    ADCON1 = 0x0E;     // AN0 como analógico, restante digital
-    CMCON  = 0x07;     // Desabilita comparadores
+    ADCON1 = 0x0E;    // AN0 analógico, demais digitais
+    CMCON  = 0x07;    // Desabilita comparadores
 
-    PWM1_Init(5000);   // Inicializa PWM com 5kHz
-    PWM1_Start();      // Inicia PWM
+    PWM1_Init(5000);  // PWM em 5kHz
+    PWM1_Start();
 
-    Lcd_Init();        // Inicializa LCD
+    Lcd_Init();
     Lcd_Cmd(_LCD_CLEAR);
     Lcd_Cmd(_LCD_CURSOR_OFF);
 
-    // === LOOP PRINCIPAL ===
     while(1) {
-        valorAD = ADC_Get_Sample(0);              // Lê trimpot
-        tensao  = (valorAD * 5.0) / 1023.0;        // Converte em volts
-        duty    = valorAD / 4;                     // Duty de 0–255
+        valorAD = ADC_Get_Sample(0);                 // Leitura analógica
+        tensao  = (valorAD * 5.0) / 1023.0;           // Conversão para volts
+        duty    = valorAD / 4;                        // De 0–1023 para 0–255
 
-        PWM1_Set_Duty(duty);                       // Aplica PWM
+        PWM1_Set_Duty(duty);                          // Atualiza PWM
 
-        // === ATUALIZA LCD ===
+        // Atualiza LCD com tensão e duty
         FloatToStr(tensao, textoADC);
         IntToStr(duty, textoDuty);
-
+        Lcd_Cmd(_LCD_CLEAR);
         Lcd_Out(1,1,"V: ");
         Lcd_Out_Cp(textoADC);
         Lcd_Out(2,1,"PWM: ");
         Lcd_Out_Cp(textoDuty);
 
-        // === CONTROLE DOS 8 LEDS GRADATIVO ===
+        // LEDs progressivos conforme duty
         PORTB = 0x00;
-
         if (duty >= 32)   PORTB.F0 = 1;
         if (duty >= 64)   PORTB.F1 = 1;
         if (duty >= 96)   PORTB.F2 = 1;
