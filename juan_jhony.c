@@ -37,7 +37,7 @@ void main() {
     Lcd_Cmd(_LCD_CURSOR_OFF);
 
     while(1) {
-        valorAD = ADC_Get_Sample(0);                 // Leitura analógica
+        valorAD = ADC_Read(0);                 // Leitura analógica
         tensao  = (valorAD * 5.0) / 1023.0;           // Conversão para volts
         duty    = valorAD / 4;                        // De 0–1023 para 0–255
 
