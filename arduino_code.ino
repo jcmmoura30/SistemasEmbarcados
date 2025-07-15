@@ -1,79 +1,140 @@
+const int ledPins[4] = {7, 8, 9, 10};  // LEDs para indicar tentativas erradas
+const int buzzerPin = 11;               // Buzzer
+const int senhaCorreta[] = {1, 2, 3, 4}; // Exemplo de senha
+const int tamanhoSenha = 4;
 
-// Definições para LCD (ajuste pinos conforme seu hardware)
-sbit LCD_RS at RE2_bit;
-sbit LCD_EN at RE1_bit;
-sbit LCD_D7 at RD7_bit;
-sbit LCD_D6 at RD6_bit;
-sbit LCD_D5 at RD5_bit;
-sbit LCD_D4 at RD4_bit;
+int tentativasErradas = 0;
+bool cofreDesbloqueado = false;
 
-sbit LCD_RS_Direction at TRISE2_bit;
-sbit LCD_EN_Direction at TRISE1_bit;
-sbit LCD_D7_Direction at TRISD7_bit;
-sbit LCD_D6_Direction at TRISD6_bit;
-sbit LCD_D5_Direction at TRISD5_bit;
-sbit LCD_D4_Direction at TRISD4_bit;
+String entradaSerial = "";
 
-#define BOTAO_RESET PORTB.F0  // Botão conectado em RB0
-#define TRIS_BOTAO_RESET TRISB.F0
-char recebido;       // caractere recebido via UART
-unsigned int tentativas = 0;
-int resetFlag = 0;
-void main() {
-    // Configurações iniciais
-    ADCON1 = 0x0F;      // Configura portas como digitais
-    TRISB.F0 = 1;       // RB0 como entrada para botão reset
-    TRISB.F1 = 0;       // RB1 como saída (se quiser usar para debug)
+void setup() {
+  Serial.begin(9600);    // Comunicação com monitor serial (entrada senha)
+  Serial1.begin(9600);   // Comunicação UART com PIC
 
-    // Inicializa LCD
-    Lcd_Init();
-    Lcd_Cmd(_LCD_CURSOR_OFF);
-    Lcd_Cmd(_LCD_CLEAR);
+  for (int i = 0; i < 4; i++) {
+    pinMode(ledPins[i], OUTPUT);
+    digitalWrite(ledPins[i], LOW);
+  }
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);
 
-    // Inicializa UART a 9600 baud
-    UART1_Init(9600);
-    Delay_ms(100);
+  Serial.println("Sistema Cofre Inicializado.");
+  Serial.println("Digite a senha:");
+}
 
-    // Mensagem inicial
-    Lcd_Out(1, 1, "Cofre Inicializado");
-    Lcd_Out(2, 1, "Tentativas: 0");
-
-    while(1) {
-        // Verifica se recebeu algo do Arduino
-        if (UART1_Data_Ready()) {
-            recebido = UART1_Read();
-            switch(recebido) {
-                case 'E': // Tentativa errada chegou
-                    tentativas++;
-                    Lcd_Cmd(_LCD_CLEAR);
-                    Lcd_Out(1, 1, "Senha Errada!");
-                    Lcd_Out(2, 1, "Tentativas:");
-                    Lcd_Out(2, 12, tentativas + '0');  // Mostra número tentativas
-                    break;
-                case 'U': // Cofre desbloqueado
-                    Lcd_Cmd(_LCD_CLEAR);
-                    Lcd_Out(1, 1, "ACESSO LIBERADO!");
-                    Lcd_Out(2, 1, "Cofre aberto");
-                    tentativas = 0;  // reseta tentativas após sucesso
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // Verifica botão reset (pulled-up, ativo baixo)
-        if (BOTAO_RESET == 0 && resetFlag == 1) {
-            resetFlag = 1;
-            tentativas = 0;
-            Lcd_Cmd(_LCD_CLEAR);
-            Lcd_Out(1, 1, "Tentativas zeradas");
-            Lcd_Out(2, 1, "Sistema resetado");
-            UART1_Write('R');  // Envia comando de reset para Arduino
-            Delay_ms(500);
-        }
-
-        if (BOTAO_RESET == 1) {
-            resetFlag = 0; // libera flag para próximo reset
-        }
+void loop() {
+  // Verifica se recebeu comando do PIC para resetar tentativas
+  if (Serial1.available()) {
+    char comando = Serial1.read();
+    if (comando == 'R') {  // R = Reset enviado pelo PIC
+      resetTentativas();
+      Serial.println("Tentativas resetadas via PIC.");
     }
+  }
+
+  // Lê dados do monitor serial para receber a senha
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (entradaSerial.length() > 0) {
+        verificaSenha(entradaSerial);
+        entradaSerial = "";
+      }
+    } else {
+      entradaSerial += c;
+    }
+  }
+}
+
+void verificaSenha(String senhaInput) {
+  if (cofreDesbloqueado) {
+    Serial.println("Cofre já desbloqueado.");
+    return;
+  }
+
+  // Converte entrada para array int
+  if (senhaInput.length() != tamanhoSenha) {
+    Serial.println("Senha incorreta (tamanho diferente).");
+    registraTentativaErrada();
+    return;
+  }
+
+  int senhaInputInt[tamanhoSenha];
+  for (int i = 0; i < tamanhoSenha; i++) {
+    if (!isDigit(senhaInput[i])) {
+      Serial.println("Senha deve conter apenas dígitos.");
+      registraTentativaErrada();
+      return;
+    }
+    senhaInputInt[i] = senhaInput[i] - '0';
+  }
+
+  // Compara com senha correta
+  bool correta = true;
+  for (int i = 0; i < tamanhoSenha; i++) {
+    if (senhaInputInt[i] != senhaCorreta[i]) {
+      correta = false;
+      break;
+    }
+  }
+
+  if (correta) {
+    cofreDesbloqueado = true;
+    Serial.println("Senha correta! Cofre desbloqueado.");
+    // Envia sinal para PIC mostrar mensagem
+    Serial1.write('U');  // U = Unlock
+    apagaTudo();
+  } else {
+    Serial.println("Senha incorreta.");
+    registraTentativaErrada();
+  }
+}
+
+void registraTentativaErrada() {
+  tentativasErradas++;
+  atualizaIndicadores();
+
+  // Envia para PIC o número de tentativas
+  Serial1.write('E'); // E = Error / tentativa errada
+  Serial1.write(tentativasErradas);
+
+  if (tentativasErradas >= 4) {
+    Serial.println("MÁXIMO DE TENTATIVAS ERRADAS! Buzzer acionado.");
+    digitalWrite(buzzerPin, HIGH);
+    piscaLed(tentativasErradas - 1);
+  }
+}
+
+void atualizaIndicadores() {
+  // Liga LEDs progressivamente conforme tentativas erradas
+  for (int i = 0; i < 4; i++) {
+    if (tentativasErradas > i) {
+      digitalWrite(ledPins[i], HIGH);
+    } else {
+      digitalWrite(ledPins[i], LOW);
+    }
+  }
+  if (tentativasErradas < 4) {
+    digitalWrite(buzzerPin, LOW);
+  }
+}
+
+void piscaLed(int index) {
+  // Pisca LED específico (exemplo: quarto LED)
+  if (index < 0 || index >= 4) return;
+  digitalWrite(ledPins[index], !digitalRead(ledPins[index]));
+}
+
+void apagaTudo() {
+  // Apaga todos LEDs e buzzer
+  for (int i = 0; i < 4; i++) digitalWrite(ledPins[i], LOW);
+  digitalWrite(buzzerPin, LOW);
+}
+
+void resetTentativas() {
+  tentativasErradas = 0;
+  cofreDesbloqueado = false;
+  apagaTudo();
+  Serial.println("Sistema resetado. Digite a senha:");
 }
