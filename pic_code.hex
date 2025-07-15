@@ -18,7 +18,7 @@ sbit LCD_D4_Direction at TRISD4_bit;
 
 char recebido;       // caractere recebido via UART
 unsigned int tentativas = 0;
-bit resetFlag = 0;
+int resetFlag = 0;
 
 void main() {
     // Configurações iniciais
