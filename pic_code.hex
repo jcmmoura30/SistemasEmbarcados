@@ -21,7 +21,7 @@ unsigned int tentativas = 0;
 int resetFlag = 0;
 
 void main() {
-     char convert[1];
+     char convert;
     // Configurações iniciais
     ADCON1 = 0x0F;      // Configura portas como digitais
     TRISB.F0 = 1;       // RB0 como entrada para botão reset
@@ -43,11 +43,24 @@ void main() {
             switch(recebido) {
                 case 'E': // Tentativa errada chegou
                     tentativas++;
-                    sprintf(convert, "%u", tentativas);
+                    
                     Lcd_Cmd(_LCD_CLEAR);
                     Lcd_Out(1, 1, "Senha Errada!");
                     Lcd_Out(2, 1, "Tentativas:");
-                    Lcd_Out(2, 12, convert);  // Mostra número tentativas
+                    if (tentativas == 1) {
+                       Lcd_Out(2, 13, "1");  // Mostra número tentativas
+                    }
+                    if (tentativas == 2) {
+                       Lcd_Out(2, 13, "2");  // Mostra número tentativas
+                    }
+                    if (tentativas == 3) {
+                       Lcd_Out(2, 13, "3");  // Mostra número tentativas
+                    }
+                    if (tentativas == 4) {
+                       Lcd_Cmd(_LCD_CLEAR);
+                       Lcd_Out(1, 1, " Cofre ");
+                       Lcd_Out(2, 1, "Bloqueado!");
+                    }
                     break;
                 case 'U': // Cofre desbloqueado
                     Lcd_Cmd(_LCD_CLEAR);
