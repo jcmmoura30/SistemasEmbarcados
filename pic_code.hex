@@ -21,24 +21,21 @@ unsigned int tentativas = 0;
 int resetFlag = 0;
 
 void main() {
+     char convert[1];
     // Configurações iniciais
     ADCON1 = 0x0F;      // Configura portas como digitais
     TRISB.F0 = 1;       // RB0 como entrada para botão reset
     TRISB.F1 = 0;       // RB1 como saída (se quiser usar para debug)
-    
     // Inicializa LCD
     Lcd_Init();
     Lcd_Cmd(_LCD_CURSOR_OFF);
     Lcd_Cmd(_LCD_CLEAR);
-
     // Inicializa UART a 9600 baud
     UART1_Init(9600);
     Delay_ms(100);
-
     // Mensagem inicial
     Lcd_Out(1, 1, "Cofre Inicializado");
     Lcd_Out(2, 1, "Tentativas: 0");
-
     while(1) {
         // Verifica se recebeu algo do Arduino
         if (UART1_Data_Ready()) {
@@ -46,10 +43,11 @@ void main() {
             switch(recebido) {
                 case 'E': // Tentativa errada chegou
                     tentativas++;
+                    sprintf(convert, "%u", tentativas);
                     Lcd_Cmd(_LCD_CLEAR);
                     Lcd_Out(1, 1, "Senha Errada!");
                     Lcd_Out(2, 1, "Tentativas:");
-                    Lcd_Out(2, 12, tentativas + '0');  // Mostra número tentativas
+                    Lcd_Out(2, 12, convert);  // Mostra número tentativas
                     break;
                 case 'U': // Cofre desbloqueado
                     Lcd_Cmd(_LCD_CLEAR);
@@ -61,10 +59,9 @@ void main() {
                     break;
             }
         }
-
         // Verifica botão reset (pulled-up, ativo baixo)
-        if (BOTAO_RESET == 0 && resetFlag == 0) {
-            resetFlag = 1;
+        if (BOTAO_RESET == 1 && resetFlag == 1) {
+            resetFlag = 0;
             tentativas = 0;
             Lcd_Cmd(_LCD_CLEAR);
             Lcd_Out(1, 1, "Tentativas zeradas");
@@ -72,7 +69,6 @@ void main() {
             UART1_Write('R');  // Envia comando de reset para Arduino
             Delay_ms(500);
         }
-
         if (BOTAO_RESET == 1) {
             resetFlag = 0; // libera flag para próximo reset
         }
