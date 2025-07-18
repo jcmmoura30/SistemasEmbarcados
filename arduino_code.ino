@@ -1,6 +1,6 @@
 const int ledPins[4] = {7, 8, 9, 10};  // LEDs para indicar tentativas erradas
-const int buzzerPin = 11;               // Buzzer
-const int senhaCorreta[] = {1, 2, 3, 4}; // Exemplo de senha
+const int buzzerPin = 11;              // Buzzer
+const int senhaCorreta[] = {1, 2, 3, 4}; // Senha correta
 const int tamanhoSenha = 4;
 
 int tentativasErradas = 0;
@@ -53,7 +53,7 @@ void verificaSenha(String senhaInput) {
     return;
   }
 
-  // Converte entrada para array int
+  // Verifica tamanho da senha
   if (senhaInput.length() != tamanhoSenha) {
     Serial.println("Senha incorreta (tamanho diferente).");
     registraTentativaErrada();
@@ -82,8 +82,7 @@ void verificaSenha(String senhaInput) {
   if (correta) {
     cofreDesbloqueado = true;
     Serial.println("Senha correta! Cofre desbloqueado.");
-    // Envia sinal para PIC mostrar mensagem
-    Serial1.write('U');  // U = Unlock
+    Serial1.write('U');  // Envia sinal para PIC
     apagaTudo();
   } else {
     Serial.println("Senha incorreta.");
@@ -95,19 +94,22 @@ void registraTentativaErrada() {
   tentativasErradas++;
   atualizaIndicadores();
 
-  // Envia para PIC o número de tentativas
-  Serial1.write('E'); // E = Error / tentativa errada
+  Serial1.write('E'); // E = tentativa errada
   Serial1.write(tentativasErradas);
 
   if (tentativasErradas >= 4) {
     Serial.println("MÁXIMO DE TENTATIVAS ERRADAS! Buzzer acionado.");
     digitalWrite(buzzerPin, HIGH);
-    piscaLed(tentativasErradas - 1);
+    piscaTodosLeds(10, 300);  // Pisca todos os LEDs 10 vezes
+
+    // Após piscadas, manter todos LEDs acesos
+    for (int i = 0; i < 4; i++) {
+      digitalWrite(ledPins[i], HIGH);
+    }
   }
 }
 
 void atualizaIndicadores() {
-  // Liga LEDs progressivamente conforme tentativas erradas
   for (int i = 0; i < 4; i++) {
     if (tentativasErradas > i) {
       digitalWrite(ledPins[i], HIGH);
@@ -115,20 +117,29 @@ void atualizaIndicadores() {
       digitalWrite(ledPins[i], LOW);
     }
   }
+
   if (tentativasErradas < 4) {
     digitalWrite(buzzerPin, LOW);
   }
 }
 
-void piscaLed(int index) {
-  // Pisca LED específico (exemplo: quarto LED)
-  if (index < 0 || index >= 4) return;
-  digitalWrite(ledPins[index], !digitalRead(ledPins[index]));
+void piscaTodosLeds(int vezes, int intervalo) {
+  for (int i = 0; i < vezes; i++) {
+    for (int j = 0; j < 4; j++) {
+      digitalWrite(ledPins[j], HIGH);
+    }
+    delay(intervalo);
+    for (int j = 0; j < 4; j++) {
+      digitalWrite(ledPins[j], LOW);
+    }
+    delay(intervalo);
+  }
 }
 
 void apagaTudo() {
-  // Apaga todos LEDs e buzzer
-  for (int i = 0; i < 4; i++) digitalWrite(ledPins[i], LOW);
+  for (int i = 0; i < 4; i++) {
+    digitalWrite(ledPins[i], LOW);
+  }
   digitalWrite(buzzerPin, LOW);
 }
 
